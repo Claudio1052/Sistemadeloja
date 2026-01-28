@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDV Web SaaS - Sistema de Ponto de Venda</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Toastr CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --success-color: #06d6a0;
+            --danger-color: #ef476f;
+            --warning-color: #ffd166;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #f8f9fa;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .cursor-pointer {
+            cursor: pointer;
+        }
+        
+        .product-card {
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-color: var(--primary-color);
+        }
+        
+        .product-card:active {
+            transform: translateY(0);
+        }
+        
+        .cart-item {
+            border-left: 4px solid var(--primary-color);
+            margin-bottom: 8px;
+        }
+        
+        .barcode-input {
+            font-size: 24px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        
+        .keyboard-shortcut {
+            background: #e9ecef;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-size: 12px;
+            color: #495057;
+        }
+        
+        .sale-complete {
+            animation: saleComplete 2s ease;
+        }
+        
+        @keyframes saleComplete {
+            0% { background-color: #06d6a0; }
+            50% { background-color: #06d6a0; }
+            100% { background-color: transparent; }
+        }
+        
+        .low-stock {
+            border-left-color: var(--danger-color) !important;
+        }
+        
+        .receipt-print {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        
+        /* Estilo para impressão */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .receipt-container, .receipt-container * {
+                visibility: visible;
+            }
+            .receipt-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+        }
+        
+        /* Dashboard Cards */
+        .dashboard-card {
+            border-radius: 10px;
+            transition: transform 0.3s ease;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        /* Animações */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease forwards;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <!-- App Container -->
+    <div id="app" class="d-none">
+        <!-- Navigation -->
+        <nav class="navbar navbar-dark bg-primary shadow">
+            <div class="container-fluid">
+                <a class="navbar-brand fw-bold" href="#">
+                    <i class="bi bi-cash-stack me-2"></i>
+                    PDV Web SaaS
+                </a>
+                
+                <div class="d-flex align-items-center text-white">
+                    <div class="me-4 text-end">
+                        <small>Usuário: <span id="current-user">Caixa</span></small><br>
+                        <small>Loja: <span id="current-store">Loja Teste</span></small>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#dashboard" onclick="showDashboard()">
+                                <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                            </a></li>
+                            <li><a class="dropdown-item" href="#products" onclick="showProducts()">
+                                <i class="bi bi-box-seam me-2"></i>Produtos
+                            </a></li>
+                            <li><a class="dropdown-item" href="#sales" onclick="showSales()">
+                                <i class="bi bi-receipt me-2"></i>Vendas
+                            </a></li>
+                            <li><a class="dropdown-item" href="#settings" onclick="showSettings()">
+                                <i class="bi bi-gear me-2"></i>Configurações
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="logout()">
+                                <i class="bi bi-box-arrow-right me-2"></i>Sair
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="container-fluid mt-3">
+            <!-- POS Interface -->
+            <div id="pos-interface">
+                <div class="row">
+                    <!-- Left Column - Product Search & Grid -->
+                    <div class="col-md-8">
+                        <div class="card shadow mb-3">
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <div class="input-group input-group-lg">
+                                            <span class="input-group-text">
+                                                <i class="bi bi-upc-scan"></i>
+                                            </span>
+                                            <input type="text" 
+                                                   id="barcode-input" 
+                                                   class="form-control barcode-input" 
+                                                   placeholder="Código de barras ou nome do produto"
+                                                   autocomplete="off"
+                                                   autofocus>
+                                            <button class="btn btn-primary" onclick="searchProduct()">
+                                                <i class="bi bi-search"></i> Buscar
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button class="btn btn-warning w-100 h-100" onclick="openScannerModal()">
+                                            <i class="bi bi-camera"></i> Scanner Código
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Quick Shortcuts -->
+                                <div class="mb-3">
+                                    <small class="text-muted">Atalhos:</small>
+                                    <div class="d-flex flex-wrap gap-2 mt-1">
+                                        <span class="keyboard-shortcut">F2 - Dinheiro</span>
+                                        <span class="keyboard-shortcut">F3 - Cartão</span>
+                                        <span class="keyboard-shortcut">F4 - Pix</span>
+                                        <span class="keyboard-shortcut">F5 - Cancelar</span>
+                                        <span class="keyboard-shortcut">ESC - Limpar</span>
+                                        <span class="keyboard-shortcut">CTRL+F - Buscar</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Products Grid -->
+                                <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3" id="products-grid">
+                                    <!-- Products will be loaded here -->
+                                    <div class="col">
+                                        <div class="card product-card text-center p-3">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Carregando...</span>
+                                            </div>
+                                            <p class="mt-2 mb-0">Carregando produtos...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Column - Cart -->
+                    <div class="col-md-4">
+                        <div class="card shadow h-100">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-cart3"></i> Carrinho</h5>
+                                <button class="btn btn-sm btn-outline-light" onclick="clearCart()" title="Limpar carrinho">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-hover mb-0" id="cart-table">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th width="60%">Produto</th>
+                                                <th width="15%">Qtd</th>
+                                                <th width="25%">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="cart-items">
+                                            <tr>
+                                                <td colspan="3" class="text-center text-muted py-5">
+                                                    <i class="bi bi-cart-x display-6"></i><br>
+                                                    Carrinho vazio
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <div class="row">
+                                    <div class="col">
+                                        <h4 class="mb-0">Total: <span id="cart-total">R$ 0,00</span></h4>
+                                    </div>
+                                    <div class="col-auto">
+                                        <button class="btn btn-success btn-lg" onclick="showPaymentModal()" disabled id="checkout-btn">
+                                            <i class="bi bi-check-circle"></i> Finalizar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard -->
+            <div id="dashboard" class="d-none">
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card dashboard-card border-primary">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted">Vendas Hoje</h6>
+                                        <h2 id="today-sales" class="mb-0">0</h2>
+                                    </div>
+                                    <div class="bg-primary rounded-circle p-3">
+                                        <i class="bi bi-cart-check text-white fs-4"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card dashboard-card border-success">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted">Faturamento</h6>
+                                        <h2 id="today-revenue" class="mb-0">R$ 0,00</h2>
+                                    </div>
+                                    <div class="bg-success rounded-circle p-3">
+                                        <i class="bi bi-currency-dollar text-white fs-4"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card dashboard-card border-warning">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted">Prod. Baixo Estoque</h6>
+                                        <h2 id="low-stock-count" class="mb-0">0</h2>
+                                    </div>
+                                    <div class="bg-warning rounded-circle p-3">
+                                        <i class="bi bi-exclamation-triangle text-white fs-4"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card dashboard-card border-info">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="text-muted">Ticket Médio</h6>
+                                        <h2 id="average-ticket" class="mb-0">R$ 0,00</h2>
+                                    </div>
+                                    <div class="bg-info rounded-circle p-3">
+                                        <i class="bi bi-graph-up text-white fs-4"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card shadow">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Vendas Recentes</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover" id="recent-sales-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Data</th>
+                                                <th>Código</th>
+                                                <th>Total</th>
+                                                <th>Pagamento</th>
+                                                <th>Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="recent-sales">
+                                            <!-- Sales will be loaded here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card shadow">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-star"></i> Mais Vendidos</h5>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush" id="top-products">
+                                    <!-- Top products will be loaded here -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Management -->
+            <div id="products-management" class="d-none">
+                <div class="card shadow">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-box-seam"></i> Gerenciamento de Produtos</h5>
+                        <button class="btn btn-primary" onclick="showProductForm()">
+                            <i class="bi bi-plus-circle"></i> Novo Produto
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="products-table">
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Nome</th>
+                                        <th>Preço</th>
+                                        <th>Estoque</th>
+                                        <th>Status</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="products-list">
+                                    <!-- Products will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="container d-flex justify-content-center align-items-center" style="height: 100vh;">
+        <div class="card shadow-lg" style="width: 400px;">
+            <div class="card-body p-5">
+                <div class="text-center mb-4">
+                    <i class="bi bi-cash-stack text-primary display-1"></i>
+                    <h2 class="mt-3">PDV Web SaaS</h2>
+                    <p class="text-muted">Sistema de Ponto de Venda</p>
+                </div>
+                
+                <form id="login-form" onsubmit="event.preventDefault(); login();">
+                    <div class="mb-3">
+                        <label for="login-email" class="form-label">E-mail</label>
+                        <input type="email" class="form-control form-control-lg" id="login-email" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label for="login-password" class="form-label">Senha</label>
+                        <input type="password" class="form-control form-control-lg" id="login-password" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="remember-me">
+                        <label class="form-check-label" for="remember-me">Lembrar-me</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="bi bi-box-arrow-in-right"></i> Entrar
+                    </button>
+                </form>
+                
+                <div class="text-center mt-4">
+                    <small class="text-muted">Versão 1.0.0</small><br>
+                    <small class="text-muted">Teste grátis: 30 dias</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    
+    <!-- Payment Modal -->
+    <div class="modal fade" id="paymentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Finalizar Venda</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <h2 id="payment-total">R$ 0,00</h2>
+                        <p class="text-muted">Total da venda</p>
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <button class="btn btn-success w-100 h-100 py-3" onclick="processPayment('cash')">
+                                <i class="bi bi-cash-coin display-6"></i><br>
+                                Dinheiro
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-primary w-100 h-100 py-3" onclick="processPayment('card')">
+                                <i class="bi bi-credit-card display-6"></i><br>
+                                Cartão
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-info w-100 h-100 py-3" onclick="processPayment('pix')">
+                                <i class="bi bi-qr-code-scan display-6"></i><br>
+                                Pix
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-warning w-100 h-100 py-3" onclick="showOtherPaymentOptions()">
+                                <i class="bi bi-three-dots display-6"></i><br>
+                                Outros
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Cash Change -->
+                    <div id="cash-change-section" class="mt-4 d-none">
+                        <label class="form-label">Valor recebido:</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="number" class="form-control" id="cash-received" step="0.01" min="0">
+                            <button class="btn btn-outline-secondary" onclick="calculateChange()">Calcular Troco</button>
+                        </div>
+                        <div class="mt-2">
+                            <strong>Troco: <span id="cash-change">R$ 0,00</span></strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Form Modal -->
+    <div class="modal fade" id="productFormModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="productFormTitle">Novo Produto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="product-form">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Código de Barras</label>
+                                    <input type="text" class="form-control" id="product-barcode">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="generateBarcode()">
+                                        Gerar Código
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Nome do Produto *</label>
+                                    <input type="text" class="form-control" id="product-name" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Preço de Venda *</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">R$</span>
+                                        <input type="number" class="form-control" id="product-price" step="0.01" min="0" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Custo</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">R$</span>
+                                        <input type="number" class="form-control" id="product-cost" step="0.01" min="0">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Estoque *</label>
+                                    <input type="number" class="form-control" id="product-stock" min="0" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Categoria</label>
+                            <select class="form-select" id="product-category">
+                                <option value="">Selecione...</option>
+                                <option value="alimentos">Alimentos</option>
+                                <option value="bebidas">Bebidas</option>
+                                <option value="limpeza">Limpeza</option>
+                                <option value="outros">Outros</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Alerta de Estoque Baixo</label>
+                            <input type="number" class="form-control" id="product-low-stock-alert" min="1" value="10">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveProduct()">Salvar Produto</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div class="modal fade" id="receiptModal" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body receipt-container">
+                    <div class="receipt-print text-center">
+                        <h5>LOJA TESTE</h5>
+                        <p>Rua Exemplo, 123 - Centro<br>
+                        CNPJ: 12.345.678/0001-99<br>
+                        ---------------------------------</p>
+                        
+                        <p><strong>COMPROVANTE DE VENDA</strong><br>
+                        Nº: <span id="receipt-number">000001</span><br>
+                        Data: <span id="receipt-date">01/01/2024 10:00</span></p>
+                        
+                        <p>---------------------------------</p>
+                        
+                        <div id="receipt-items" class="text-start">
+                            <!-- Items will be added here -->
+                        </div>
+                        
+                        <p>---------------------------------</p>
+                        
+                        <p class="text-end">
+                            Total: <span id="receipt-total">R$ 0,00</span><br>
+                            Pagamento: <span id="receipt-payment">Dinheiro</span><br>
+                            Troco: <span id="receipt-change">R$ 0,00</span>
+                        </p>
+                        
+                        <p>---------------------------------</p>
+                        
+                        <p>Obrigado pela preferência!<br>
+                        Volte sempre!</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barcode Scanner Modal -->
+    <div class="modal fade" id="scannerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Scanner de Código de Barras</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div id="scanner-container" style="width: 100%; height: 300px; background: #000;"></div>
+                    <p class="mt-3 text-muted">Aponte a câmera para o código de barras</p>
+                    
+                    <div class="input-group mt-3">
+                        <input type="text" class="form-control" id="manual-barcode" placeholder="Ou digite manualmente">
+                        <button class="btn btn-primary" onclick="useManualBarcode()">Usar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Configurações</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs" id="settingsTabs">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-bs-target="#store-tab">Loja</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-target="#users-tab">Usuários</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-target="#subscription-tab">Assinatura</button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content mt-3">
+                        <div class="tab-pane fade show active" id="store-tab">
+                            <form id="store-form">
+                                <div class="mb-3">
+                                    <label class="form-label">Nome da Loja</label>
+                                    <input type="text" class="form-control" id="store-name" value="Minha Loja">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Endereço</label>
+                                    <textarea class="form-control" id="store-address" rows="2"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">CNPJ</label>
+                                    <input type="text" class="form-control" id="store-cnpj">
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <div class="tab-pane fade" id="users-tab">
+                            <div class="d-flex justify-content-end mb-3">
+                                <button class="btn btn-sm btn-primary" onclick="addUser()">
+                                    <i class="bi bi-plus"></i> Novo Usuário
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>E-mail</th>
+                                            <th>Perfil</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="users-list">
+                                        <tr>
+                                            <td>Administrador</td>
+                                            <td>admin@loja.com</td>
+                                            <td><span class="badge bg-primary">Gerente</span></td>
+                                            <td></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="tab-pane fade" id="subscription-tab">
+                            <div class="alert alert-info">
+                                <h5><i class="bi bi-shield-check"></i> Plano Atual: Básico</h5>
+                                <p>Valor: R$ 29,90/mês</p>
+                                <p>Próxima cobrança: 01/02/2024</p>
+                                <button class="btn btn-sm btn-outline-primary">Alterar Plano</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSettings()">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    
+    <!-- Barcode Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    
+    <script>
+        // Configuration
+        toastr.options = {
+            positionClass: "toast-top-right",
+            timeOut: 3000,
+            closeButton: true
+        };
+
+        // App State
+        const appState = {
+            user: null,
+            cart: [],
+            products: [],
+            sales: [],
+            store: {
+                name: "Loja Teste",
+                address: "Rua Exemplo, 123 - Centro",
+                cnpj: "12.345.678/0001-99"
+            },
+            subscription: {
+                plan: "basic",
+                price: 29.90,
+                nextPayment: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            }
+        };
+
+        // Sample Products Data
+        const sampleProducts = [
+            { id: 1, barcode: "7891000142007", name: "Coca-Cola 2L", price: 9.99, stock: 50, category: "bebidas", lowStockAlert: 5 },
+            { id: 2, barcode: "7891910000197", name: "Arroz 5kg", price: 24.90, stock: 30, category: "alimentos", lowStockAlert: 10 },
+            { id: 3, barcode: "7892840222949", name: "Sabão em Pó 1kg", price: 12.99, stock: 8, category: "limpeza", lowStockAlert: 10 },
+            { id: 4, barcode: "7896036090016", name: "Café 500g", price: 18.50, stock: 25, category: "alimentos", lowStockAlert: 5 },
+            { id: 5, barcode: "7891149104504", name: "Leite 1L", price: 5.99, stock: 40, category: "alimentos", lowStockAlert: 10 },
+            { id: 6, barcode: "7891358013642", name: "Açúcar 1kg", price: 4.99, stock: 15, category: "alimentos", lowStockAlert: 5 },
+            { id: 7, barcode: "7891150057508", name: "Óleo 900ml", price: 8.99, stock: 20, category: "alimentos", lowStockAlert: 5 },
+            { id: 8, barcode: "7891058005018", name: "Macarrão 500g", price: 3.99, stock: 35, category: "alimentos", lowStockAlert: 10 }
+        ];
+
+        // Sample Sales Data
+        const sampleSales = [
+            { id: 1, date: new Date(), total: 45.97, payment: "dinheiro", items: 3 },
+            { id: 2, date: new Date(Date.now() - 3600000), total: 32.50, payment: "cartao", items: 2 },
+            { id: 3, date: new Date(Date.now() - 7200000), total: 67.89, payment: "pix", items: 5 }
+        ];
+
+        // Initialize App
+        function initApp() {
+            // Load data from localStorage
+            const savedProducts = localStorage.getItem('pdv_products');
+            const savedSales = localStorage.getItem('pdv_sales');
+            const savedUser = localStorage.getItem('pdv_user');
+            
+            if (savedProducts) {
+                appState.products = JSON.parse(savedProducts);
+            } else {
+                appState.products = sampleProducts;
+                saveProducts();
+            }
+            
+            if (savedSales) {
+                appState.sales = JSON.parse(savedSales);
+            } else {
+                appState.sales = sampleSales;
+                saveSales();
+            }
+            
+            if (savedUser) {
+                appState.user = JSON.parse(savedUser);
+                showApp();
+            }
+            
+            // Setup keyboard shortcuts
+            setupKeyboardShortcuts();
+            
+            // Load products grid
+            loadProductsGrid();
+            
+            // Update cart
+            updateCartDisplay();
+            
+            // Setup tab navigation
+            setupTabs();
+        }
+
+        // Authentication
+        function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            // Simple validation
+            if (!email || !password) {
+                toastr.error('Preencha todos os campos');
+                return;
+            }
+            
+            // Mock authentication
+            appState.user = {
+                id: 1,
+                email: email,
+                name: email.split('@')[0],
+                role: 'cashier'
+            };
+            
+            // Save to localStorage
+            localStorage.setItem('pdv_user', JSON.stringify(appState.user));
+            
+            // Show success message
+            toastr.success('Login realizado com sucesso!');
+            
+            // Show app interface
+            showApp();
+        }
+
+        function logout() {
+            appState.user = null;
+            localStorage.removeItem('pdv_user');
+            document.getElementById('app').classList.add('d-none');
+            document.getElementById('login-screen').classList.remove('d-none');
+            toastr.info('Sessão encerrada');
+        }
+
+        function showApp() {
+            document.getElementById('login-screen').classList.add('d-none');
+            document.getElementById('app').classList.remove('d-none');
+            document.getElementById('current-user').textContent = appState.user.name;
+            updateDashboard();
+        }
+
+        // POS Functions
+        function searchProduct() {
+            const input = document.getElementById('barcode-input');
+            const searchTerm = input.value.trim().toLowerCase();
+            
+            if (!searchTerm) return;
+            
+            // Search by barcode or name
+            const product = appState.products.find(p => 
+                p.barcode === searchTerm || 
+                p.name.toLowerCase().includes(searchTerm)
+            );
+            
+            if (product) {
+                addToCart(product);
+                input.value = '';
+                input.focus();
+                toastr.success(`${product.name} adicionado ao carrinho`);
+            } else {
+                toastr.error('Produto não encontrado');
+            }
+        }
+
+        function addToCart(product) {
+            // Check if product is already in cart
+            const existingItem = appState.cart.find(item => item.id === product.id);
+            
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                appState.cart.push({
+                    ...product,
+                    quantity: 1
+                });
+            }
+            
+            updateCartDisplay();
+        }
+
+        function removeFromCart(productId) {
+            appState.cart = appState.cart.filter(item => item.id !== productId);
+            updateCartDisplay();
+        }
+
+        function updateCartDisplay() {
+            const cartItems = document.getElementById('cart-items');
+            const cartTotal = document.getElementById('cart-total');
+            const checkoutBtn = document.getElementById('checkout-btn');
+            
+            if (appState.cart.length === 0) {
+                cartItems.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-5">
+                            <i class="bi bi-cart-x display-6"></i><br>
+                            Carrinho vazio
+                        </td>
+                    </tr>
+                `;
+                checkoutBtn.disabled = true;
+                cartTotal.textContent = 'R$ 0,00';
+                return;
+            }
+            
+            let html = '';
+            let total = 0;
+            
+            appState.cart.forEach(item => {
+                const itemTotal = item.price * item.quantity;
+                total += itemTotal;
+                
+                html += `
+                    <tr class="cart-item ${item.stock < item.lowStockAlert ? 'table-warning' : ''}">
+                        <td>
+                            <strong>${item.name}</strong><br>
+                            <small class="text-muted">R$ ${item.price.toFixed(2)}</small>
+                        </td>
+                        <td>
+                            <div class="input-group input-group-sm">
+                                <button class="btn btn-outline-secondary" onclick="updateQuantity(${item.id}, -1)">-</button>
+                                <input type="text" class="form-control text-center" value="${item.quantity}" 
+                                       style="width: 50px;" readonly>
+                                <button class="btn btn-outline-secondary" onclick="updateQuantity(${item.id}, 1)">+</button>
+                            </div>
+                        </td>
+                        <td>
+                            R$ ${itemTotal.toFixed(2)}<br>
+                            <button class="btn btn-sm btn-danger mt-1" onclick="removeFromCart(${item.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            cartItems.innerHTML = html;
+            cartTotal.textContent = `R$ ${total.toFixed(2)}`;
+            checkoutBtn.disabled = false;
+            
+            // Update payment modal total
+            document.getElementById('payment-total').textContent = `R$ ${total.toFixed(2)}`;
+        }
+
+        function updateQuantity(productId, change) {
+            const item = appState.cart.find(item => item.id === productId);
+            if (item) {
+                item.quantity += change;
+                if (item.quantity <= 0) {
+                    removeFromCart(productId);
+                } else {
+                    updateCartDisplay();
+                }
+            }
+        }
+
+        function clearCart() {
+            if (appState.cart.length === 0) return;
+            
+            if (confirm('Deseja limpar o carrinho?')) {
+                appState.cart = [];
+                updateCartDisplay();
+                toastr.info('Carrinho limpo');
+            }
+        }
+
+        // Payment Processing
+        function showPaymentModal() {
+            if (appState.cart.length === 0) {
+                toastr.warning('Adicione produtos ao carrinho');
+                return;
+            }
+            
+            const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+            modal.show();
+        }
+
+        function processPayment(method) {
+            if (appState.cart.length === 0) return;
+            
+            const total = appState.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            // Create sale record
+            const sale = {
+                id: Date.now(),
+                date: new Date(),
+                items: [...appState.cart],
+                total: total,
+                paymentMethod: method,
+                status: 'completed'
+            };
+            
+            // Update stock
+            appState.cart.forEach(cartItem => {
+                const product = appState.products.find(p => p.id === cartItem.id);
+                if (product) {
+                    product.stock -= cartItem.quantity;
+                }
+            });
+            
+            // Add to sales history
+            appState.sales.unshift(sale);
+            
+            // Save data
+            saveProducts();
+            saveSales();
+            
+            // Clear cart
+            appState.cart = [];
+            updateCartDisplay();
+            
+            // Show success
+            toastr.success('Venda realizada com sucesso!');
+            
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('paymentModal')).hide();
+            
+            // Show receipt
+            showReceipt(sale);
+            
+            // Update dashboard
+            updateDashboard();
+            
+            // Animation effect
+            document.getElementById('pos-interface').classList.add('sale-complete');
+            setTimeout(() => {
+                document.getElementById('pos-interface').classList.remove('sale-complete');
+            }, 2000);
+        }
+
+        function calculateChange() {
+            const total = appState.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const received = parseFloat(document.getElementById('cash-received').value) || 0;
+            const change = received - total;
+            
+            document.getElementById('cash-change').textContent = `R$ ${change >= 0 ? change.toFixed(2) : '0,00'}`;
+        }
+
+        // Products Management
+        function loadProductsGrid() {
+            const grid = document.getElementById('products-grid');
+            let html = '';
+            
+            appState.products.forEach(product => {
+                const lowStock = product.stock < product.lowStockAlert;
+                
+                html += `
+                    <div class="col">
+                        <div class="card product-card text-center p-3 ${lowStock ? 'low-stock' : ''} cursor-pointer"
+                             onclick="addToCart(${JSON.stringify(product).replace(/"/g, '&quot;')})">
+                            <div class="card-body">
+                                <small class="text-muted d-block mb-1">${product.barcode}</small>
+                                <h6 class="card-title mb-2">${product.name}</h6>
+                                <h5 class="text-primary mb-2">R$ ${product.price.toFixed(2)}</h5>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="badge ${product.stock > 10 ? 'bg-success' : 'bg-warning'}">
+                                        Estoque: ${product.stock}
+                                    </span>
+                                    ${lowStock ? '<span class="badge bg-danger">Baixo</span>' : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            grid.innerHTML = html;
+        }
+
+        function showProductForm(product = null) {
+            const modal = new bootstrap.Modal(document.getElementById('productFormModal'));
+            const title = document.getElementById('productFormTitle');
+            const form = document.getElementById('product-form');
+            
+            if (product) {
+                title.textContent = 'Editar Produto';
+                // Fill form with product data
+            } else {
+                title.textContent = 'Novo Produto';
+                form.reset();
+            }
+            
+            modal.show();
+        }
+
+        function saveProduct() {
+            // Get form data
+            const formData = {
+                barcode: document.getElementById('product-barcode').value,
+                name: document.getElementById('product-name').value,
+                price: parseFloat(document.getElementById('product-price').value),
+                cost: parseFloat(document.getElementById('product-cost').value) || 0,
+                stock: parseInt(document.getElementById('product-stock').value),
+                category: document.getElementById('product-category').value,
+                lowStockAlert: parseInt(document.getElementById('product-low-stock-alert').value)
+            };
+            
+            // Validate
+            if (!formData.name || !formData.price || formData.stock < 0) {
+                toastr.error('Preencha os campos obrigatórios corretamente');
+                return;
+            }
+            
+            // Generate ID if new product
+            if (!formData.id) {
+                formData.id = Date.now();
+            }
+            
+            // Add to products
+            appState.products.push(formData);
+            saveProducts();
+            loadProductsGrid();
+            
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('productFormModal')).hide();
+            toastr.success('Produto salvo com sucesso!');
+        }
+
+        function generateBarcode() {
+            // Generate random barcode (EAN-13 format)
+            const barcode = '789' + Math.floor(1000000000 + Math.random() * 9000000000).toString().substring(0, 9);
+            document.getElementById('product-barcode').value = barcode;
+        }
+
+        // Dashboard Functions
+        function updateDashboard() {
+            // Today's sales
+            const today = new Date().toDateString();
+            const todaySales = appState.sales.filter(sale => 
+                new Date(sale.date).toDateString() === today
+            );
+            
+            document.getElementById('today-sales').textContent = todaySales.length;
+            
+            // Today's revenue
+            const todayRevenue = todaySales.reduce((sum, sale) => sum + sale.total, 0);
+            document.getElementById('today-revenue').textContent = `R$ ${todayRevenue.toFixed(2)}`;
+            
+            // Low stock count
+            const lowStockCount = appState.products.filter(p => p.stock < p.lowStockAlert).length;
+            document.getElementById('low-stock-count').textContent = lowStockCount;
+            
+            // Average ticket
+            const avgTicket = todaySales.length > 0 ? todayRevenue / todaySales.length : 0;
+            document.getElementById('average-ticket').textContent = `R$ ${avgTicket.toFixed(2)}`;
+            
+            // Recent sales
+            loadRecentSales();
+            
+            // Top products
+            loadTopProducts();
+        }
+
+        function loadRecentSales() {
+            const tbody = document.getElementById('recent-sales');
+            let html = '';
+            
+            appState.sales.slice(0, 10).forEach(sale => {
+                const date = new Date(sale.date);
+                html += `
+                    <tr>
+                        <td>${date.toLocaleDateString()} ${date.toLocaleTimeString()}</td>
+                        <td>#${sale.id.toString().substring(8)}</td>
+                        <td>R$ ${sale.total.toFixed(2)}</td>
+                        <td>${getPaymentMethodName(sale.paymentMethod)}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="showReceipt(${JSON.stringify(sale).replace(/"/g, '&quot;')})">
+                                <i class="bi bi-receipt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+        }
+
+        function loadTopProducts() {
+            // Calculate top products from sales
+            const productSales = {};
+            appState.sales.forEach(sale => {
+                sale.items.forEach(item => {
+                    if (!productSales[item.id]) {
+                        productSales[item.id] = { product: item, quantity: 0 };
+                    }
+                    productSales[item.id].quantity += item.quantity;
+                });
+            });
+            
+            const topProducts = Object.values(productSales)
+                .sort((a, b) => b.quantity - a.quantity)
+                .slice(0, 5);
+            
+            const list = document.getElementById('top-products');
+            let html = '';
+            
+            topProducts.forEach((item, index) => {
+                html += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-primary me-2">${index + 1}</span>
+                            ${item.product.name}
+                        </div>
+                        <span class="badge bg-success">${item.quantity} un</span>
+                    </li>
+                `;
+            });
+            
+            list.innerHTML = html || '<li class="list-group-item text-muted">Nenhuma venda ainda</li>';
+        }
+
+        // Receipt Functions
+        function showReceipt(sale) {
+            // Update receipt content
+            document.getElementById('receipt-number').textContent = sale.id.toString().substring(8);
+            document.getElementById('receipt-date').textContent = 
+                new Date(sale.date).toLocaleDateString() + ' ' + 
+                new Date(sale.date).toLocaleTimeString();
+            
+            // Add items
+            const itemsDiv = document.getElementById('receipt-items');
+            let itemsHtml = '';
+            
+            sale.items.forEach(item => {
+                itemsHtml += `${item.quantity}x ${item.name.substring(0, 20)} R$ ${(item.price * item.quantity).toFixed(2)}\n`;
+            });
+            
+            itemsDiv.textContent = itemsHtml;
+            
+            // Update totals
+            document.getElementById('receipt-total').textContent = `R$ ${sale.total.toFixed(2)}`;
+            document.getElementById('receipt-payment').textContent = getPaymentMethodName(sale.paymentMethod);
+            document.getElementById('receipt-change').textContent = 'R$ 0,00';
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('receiptModal'));
+            modal.show();
+        }
+
+        // Navigation
+        function showDashboard() {
+            hideAllSections();
+            document.getElementById('dashboard').classList.remove('d-none');
+            updateDashboard();
+        }
+
+        function showProducts() {
+            hideAllSections();
+            document.getElementById('products-management').classList.remove('d-none');
+            loadProductsTable();
+        }
+
+        function showSales() {
+            // Similar to dashboard but focused on sales
+            hideAllSections();
+            document.getElementById('dashboard').classList.remove('d-none');
+            updateDashboard();
+        }
+
+        function showSettings() {
+            const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+            modal.show();
+        }
+
+        function hideAllSections() {
+            document.getElementById('pos-interface').classList.add('d-none');
+            document.getElementById('dashboard').classList.add('d-none');
+            document.getElementById('products-management').classList.add('d-none');
+        }
+
+        function loadProductsTable() {
+            const tbody = document.getElementById('products-list');
+            let html = '';
+            
+            appState.products.forEach(product => {
+                const lowStock = product.stock < product.lowStockAlert;
+                
+                html += `
+                    <tr class="${lowStock ? 'table-warning' : ''}">
+                        <td>${product.barcode}</td>
+                        <td>${product.name}</td>
+                        <td>R$ ${product.price.toFixed(2)}</td>
+                        <td>
+                            <span class="badge ${product.stock > 10 ? 'bg-success' : 'bg-warning'}">
+                                ${product.stock}
+                            </span>
+                            ${lowStock ? '<span class="badge bg-danger ms-1">Baixo</span>' : ''}
+                        </td>
+                        <td>${product.stock > 0 ? 'Disponível' : 'Esgotado'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editProduct(${product.id})">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteProduct(${product.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+        }
+
+        // Barcode Scanner
+        let html5QrCode = null;
+
+        function openScannerModal() {
+            const modal = new bootstrap.Modal(document.getElementById('scannerModal'));
+            modal.show();
+            
+            // Initialize scanner
+            setTimeout(() => {
+                if (!html5QrCode) {
+                    html5QrCode = new Html5Qrcode("scanner-container");
+                }
+                
+                const config = { fps: 10, qrbox: 250 };
+                
+                html5QrCode.start(
+                    { facingMode: "environment" },
+                    config,
+                    onScanSuccess,
+                    onScanError
+                ).catch(err => {
+                    console.error("Erro ao iniciar scanner:", err);
+                    toastr.error('Não foi possível acessar a câmera');
+                });
+            }, 500);
+        }
+
+        function onScanSuccess(decodedText) {
+            // Stop scanner
+            html5QrCode.stop();
+            
+            // Find product
+            const product = appState.products.find(p => p.barcode === decodedText);
+            
+            if (product) {
+                addToCart(product);
+                toastr.success(`${product.name} adicionado ao carrinho`);
+                bootstrap.Modal.getInstance(document.getElementById('scannerModal')).hide();
+            } else {
+                toastr.error('Produto não encontrado');
+            }
+        }
+
+        function onScanError(error) {
+            // Handle scan errors quietly
+            console.warn("Scan error:", error);
+        }
+
+        function useManualBarcode() {
+            const barcode = document.getElementById('manual-barcode').value;
+            if (barcode) {
+                const product = appState.products.find(p => p.barcode === barcode);
+                if (product) {
+                    addToCart(product);
+                    toastr.success(`${product.name} adicionado ao carrinho`);
+                    bootstrap.Modal.getInstance(document.getElementById('scannerModal')).hide();
+                } else {
+                    toastr.error('Produto não encontrado');
+                }
+            }
+        }
+
+        // Utilities
+        function getPaymentMethodName(method) {
+            const methods = {
+                cash: 'Dinheiro',
+                card: 'Cartão',
+                pix: 'Pix'
+            };
+            return methods[method] || method;
+        }
+
+        function saveProducts() {
+            localStorage.setItem('pdv_products', JSON.stringify(appState.products));
+        }
+
+        function saveSales() {
+            localStorage.setItem('pdv_sales', JSON.stringify(appState.sales));
+        }
+
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                // Don't trigger shortcuts when typing in inputs
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    return;
+                }
+                
+                switch (e.key) {
+                    case 'F2':
+                        e.preventDefault();
+                        processPayment('cash');
+                        break;
+                    case 'F3':
+                        e.preventDefault();
+                        processPayment('card');
+                        break;
+                    case 'F4':
+                        e.preventDefault();
+                        processPayment('pix');
+                        break;
+                    case 'F5':
+                        e.preventDefault();
+                        clearCart();
+                        break;
+                    case 'Escape':
+                        e.preventDefault();
+                        clearCart();
+                        break;
+                    case 'f':
+                        if (e.ctrlKey) {
+                            e.preventDefault();
+                            document.getElementById('barcode-input').focus();
+                        }
+                        break;
+                }
+            });
+        }
+
+        function setupTabs() {
+            const tabButtons = document.querySelectorAll('[data-bs-target]');
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.getAttribute('data-bs-target').substring(1);
+                    const tabPanes = document.querySelectorAll('.tab-pane');
+                    
+                    tabPanes.forEach(pane => pane.classList.remove('show', 'active'));
+                    document.getElementById(targetId).classList.add('show', 'active');
+                    
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                });
+            });
+        }
+
+        // Initialize when page loads
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
